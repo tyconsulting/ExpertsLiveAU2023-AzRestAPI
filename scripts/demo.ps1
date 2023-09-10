@@ -10,23 +10,31 @@ $subId = '681512a3-2969-4449-b1b0-5b8dcad20059'
 $vmRg = 'rg-ae-el-2023'
 $vmName = 'vm-el2023-001'
 $kvName = 'kv-el2023-001'
-# Invoke command on Azure Vm - Get oAuth token for the VM managed identity for accessing key vaults
 
+# Invoke command on Azure Vm - Get oAuth token for the VM managed identity for accessing key vaults
+# command to be executed on the VM to get the oAuth token for Key Vault
 $vmCommand = @(
   "((invoke-webrequest -Headers @{Metadata='true'} -Uri 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://vault.azure.net' -UseBasicParsing).content | convertfrom-json).access_token"
 )
+
+#VM Run Command REST API URI
 $vmRunCmdUri = "https://management.azure.com/subscriptions/$subId/resourceGroups/$vmRg/providers/Microsoft.Compute/virtualMachines/$vmName/runCommand?api-version=2023-07-01"
 
+#VM Run Command request body
 $vmRunCmdBody = @{
   commandId = 'RunPowerShellScript'
   script    = $vmCommand
 } | ConvertTo-Json
+
+#VM Run Command request header
 $vmRunCmdHeaders = @{
   Authorization  = "Bearer $($ARMToken.Token)"
   'Content-Type' = 'application/json'
 }
+#Invoke VM Run Command
 $vmRunCmdRequest = invoke-webrequest -Uri $vmRunCmdUri -Method POST -Headers $vmRunCmdHeaders -Body $vmRunCmdBody
 
+# Keep polling the VM Run Command result until it is completed
 $AsyncOpsUri = $vmRunCmdRequest.Headers.'Azure-AsyncOperation'[0]
 $runCompleted = $false
 Do {
@@ -42,7 +50,11 @@ Do {
     $runCompleted = $true
   }
 } until ($runCompleted -eq $true)
+
+#Get VM Run Command result
 $vmRunCmdResult = $checkResult.content | convertfrom-Json
+
+#Extract the oAuth token for the key vault from the VM Run Command result
 $kvToken = $vmRunCmdResult.properties.output.value | where-object { $_.code -eq "ComponentStatus/StdOut/succeeded" } | foreach-object { $_.message }
 
 # Access Key Vault
@@ -63,7 +75,7 @@ $kvSecretVersionsUri = "$kvSecretUri/versions?api-version=7.4"
 
 #Get all versions
 $kvSecretVersions = Invoke-WebRequest -uri $kvSecretVersionsUri -Method GET -Headers $kvHeaders
-$kVSecretLatestVersion = ($kvSecretVersions.content | convertfrom-json).value | Sort-Object $_.attributes.created -Descending | select-object -first 1
+$kVSecretLatestVersion = ($kvSecretVersions.content | convertfrom-json).value | select-object -Last 1
 
 #Get KV secret value
 $kvSecretValueUri = "$($kvSecretLatestVersion.id)?api-version=7.4"
