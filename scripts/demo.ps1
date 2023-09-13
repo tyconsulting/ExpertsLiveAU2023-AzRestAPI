@@ -2,14 +2,14 @@
 
 add-azaccount -UseDeviceAuthentication
 
-# Get ARM token for accessing Azure VM
-$ARMToken = Get-AzAccessToken -ResourceUrl 'https://management.azure.com/'
-
 # variables
 $subId = '681512a3-2969-4449-b1b0-5b8dcad20059'
 $vmRg = 'rg-ae-el-2023'
 $vmName = 'vm-el2023-001'
 $kvName = 'kv-el2023-001'
+
+# Get ARM token for accessing Azure VM
+$ARMToken = Get-AzAccessToken -ResourceUrl 'https://management.azure.com/'
 
 # Invoke command on Azure Vm - Get oAuth token for the VM managed identity for accessing key vaults
 # command to be executed on the VM to get the oAuth token for Key Vault
@@ -40,9 +40,8 @@ $runCompleted = $false
 Do {
   Write-Verbose "Wait 5 seconds" -verbose
   start-sleep -seconds 5
-  $now = Get-Date
   Write-Verbose "Checking status via '$AsyncOpsUri'" -verbose
-  #Make sure token is not expired
+
   $checkResult = Invoke-WebRequest -uri $AsyncOpsUri -Method GET -Headers $vmRunCmdHeaders
   $checkResultStatus = ($checkResult.content | convertfrom-Json).status
   Write-Verbose "Current Status: $checkResultStatus" -verbose
@@ -65,21 +64,24 @@ $kvHeaders = @{
 }
 #Get all secrets
 $kvSecretsRequest = Invoke-WebRequest -uri $kvSecretsUri -Method GET -Headers $kvHeaders
+$AllKvSecrets = ($kvSecretsRequest.content | convertfrom-Json).value
+#Loop through all the secrets in KV
+$i = 1
+foreach ($kvSecret in $AllKvSecrets) {
 
-#First secret
-$kvSecret = ($kvSecretsRequest.content | convertfrom-Json).value[0]
+  #secret name
+  $secretName = $kvSecret.id.split('/')[-1]
+  # secret Uri
+  $kvSecretUri = $kvSecret.id
+  $kvSecretVersionsUri = "$kvSecretUri/versions?api-version=7.4"
 
-#First secret Uri
-$kvSecretUri = $kvSecret.id
-$kvSecretVersionsUri = "$kvSecretUri/versions?api-version=7.4"
-
-#Get all versions
-$kvSecretVersions = Invoke-WebRequest -uri $kvSecretVersionsUri -Method GET -Headers $kvHeaders
-$kVSecretLatestVersion = ($kvSecretVersions.content | convertfrom-json).value | select-object -Last 1
-
-#Get KV secret value
-$kvSecretValueUri = "$($kvSecretLatestVersion.id)?api-version=7.4"
-$kvSecretValueRequest = Invoke-WebRequest -uri $kvSecretValueUri -Method GET -Headers $kvHeaders
-$kvSecretValue = ($kvSecretValueRequest.content | convertfrom-json).value
-
-Write-output "The Key Vault secret value is: '$kvSecretValue'"
+  #Get all versions
+  $kvSecretVersions = Invoke-WebRequest -uri $kvSecretVersionsUri -Method GET -Headers $kvHeaders
+  $kVSecretLatestVersion = ($kvSecretVersions.content | convertfrom-json).value | select-object -Last 1
+  #Get KV secret value
+  $kvSecretValueUri = "$($kvSecretLatestVersion.id)?api-version=7.4"
+  $kvSecretValueRequest = Invoke-WebRequest -uri $kvSecretValueUri -Method GET -Headers $kvHeaders
+  $kvSecretValue = ($kvSecretValueRequest.content | convertfrom-json).value
+  Write-output "$i. The value for secret '$secretName' is: '$kvSecretValue'"
+  $i++
+}
