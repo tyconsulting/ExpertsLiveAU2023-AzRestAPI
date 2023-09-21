@@ -3,7 +3,7 @@
 add-azaccount -UseDeviceAuthentication
 
 # variables
-$subId = '681512a3-2969-4449-b1b0-5b8dcad20059'
+$subId = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 $vmRg = 'rg-ae-el-2023'
 $vmName = 'vm-el2023-001'
 $kvName = 'kv-el2023-001'

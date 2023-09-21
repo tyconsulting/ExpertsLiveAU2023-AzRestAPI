@@ -6,9 +6,9 @@ import requests
 subprocess.run(['az', 'login', '--use-device-code'])
 
 #variables
-subid='681512a3-2969-4449-b1b0-5b8dcad20059'
+subid='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 rg='rg-ae-el-2023'
-storage_account='sataoel2023demo01'
+storage_account='xxxxxxxx'
 storage_uri=f"https://management.azure.com/subscriptions/{subid}/resourceGroups/{rg}/providers/Microsoft.Storage/storageAccounts/{storage_account}?api-version=2023-01-01"
 
 # Run the Azure CLI command to get the access token
